@@ -131,7 +131,7 @@ create or replace package oc_orcam is
    --/ GERAR TEMP RESUMO ABC DE PRODUTOS NO ORCTO
    --/--------------------------------------------------------------------------
 
-   procedure gerar_resumo_orcto_abc(p_id oc_orcam_venda.id_orcamvenda%type, p_sec char default 'N');
+   procedure gerar_resumo_orcto_abc(p_id oc_orcam_venda.id_orcamvenda%type);
 end oc_orcam;
 /
 create or replace package body oc_orcam is
@@ -5121,7 +5121,7 @@ create or replace package body oc_orcam is
    --/ GERAR TEMP RESUMO ABC DE PRODUTOS NO ORCTO
    --/--------------------------------------------------------------------------
 
-   procedure gerar_resumo_orcto_abc(p_id oc_orcam_venda.id_orcamvenda%type, p_sec char default 'N') is
+   procedure gerar_resumo_orcto_abc(p_id oc_orcam_venda.id_orcamvenda%type) is
       cursor cr is
          select id_orcamvenda
                ,orcto
@@ -5139,10 +5139,9 @@ create or replace package body oc_orcam is
                ,custo_rend
                ,rendimento
                ,a.origem_produto
-               
+         
            from voc_orcto_custo_abc a
-          where a.id_orcamvenda = p_id
-          and (p_sec = 'S' or a.secundario = 'N');
+          where a.id_orcamvenda = p_id;
    begin
    
       delete toc_orcto_custo_abc;

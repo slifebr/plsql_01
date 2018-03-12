@@ -251,13 +251,7 @@ create or replace package oc_util is
                                          ,p_fil  pp_ordens.filial%type
                                          ,p_opos pp_ordens.ordem%type)
       return oc_orcam_prod.custo_prod%type;
-   --|------------------------------------------------------------------------
-   --| Custo total de Material e Servico por PROPOSTA
-   --|------------------------------------------------------------------------
-   function fnc_custo_total_material_prop(p_emp  pp_ordens.empresa%type
-                                         ,p_fil  pp_ordens.filial%type
-                                         ,p_prop pp_contratos.proposta%type)
-      return oc_orcam_prod.custo_prod%type;
+
    --|------------------------------------------------------------------------
    --| Custo total MOD por OP/OS
    --|------------------------------------------------------------------------
@@ -265,13 +259,6 @@ create or replace package oc_util is
                                     ,p_fil  pp_ordens.filial%type
                                     ,p_opos pp_ordens.ordem%type)
       return oc_orcam_prod.custo_prod%type;
-   --|------------------------------------------------------------------------
-   --| Custo total MOD por PROPOSTA
-   --|------------------------------------------------------------------------
-   function fnc_custo_total_mod_prop(p_emp  pp_ordens.empresa%type
-                                    ,p_fil  pp_ordens.filial%type
-                                    ,p_prop pp_contratos.proposta%type)
-      return oc_orcam_prod.custo_prod%type;      
 end;
 /
 create or replace package body oc_util is
@@ -3064,34 +3051,6 @@ create or replace package body oc_util is
       return v_ret;
    end;
    --|------------------------------------------------------------------------
-   --| Custo total de Material e Servico por PROPOSTA
-   --|------------------------------------------------------------------------
-   function fnc_custo_total_material_prop(p_emp  pp_ordens.empresa%type
-                                         ,p_fil  pp_ordens.filial%type
-                                         ,p_prop pp_contratos.proposta%type)
-      return oc_orcam_prod.custo_prod%type is
-   
-      cursor cr is
-         select sum(oc_util.fnc_custo_total_material(it.id_orcamprod))
-           from oc_prop_item      it
-              , oc_proposta      prop
-          where it.empresa = p_emp
-            and prop.cd_prop = p_prop
-            and it.seq_ocprop = prop.seq_ocprop
-            and prop.revisao = (select max(prop2.revisao)
-                                 from oc_proposta prop2
-                                 where prop2.cd_prop = prop.cd_prop);
-   
-      v_ret oc_orcam_prod.custo_prod%type;
-   begin
-      open cr;
-      fetch cr
-         into v_ret;
-      close cr;
-   
-      return v_ret;
-   end;
-   --|------------------------------------------------------------------------
    --| Custo total MOD por OP/OS
    --|------------------------------------------------------------------------
    function fnc_custo_total_mod_opos(p_emp  pp_ordens.empresa%type
@@ -3118,35 +3077,5 @@ create or replace package body oc_util is
    
       return v_ret;
    end;
-   
---|------------------------------------------------------------------------
-   --| Custo total MOD por PROPOSTA
-   --|------------------------------------------------------------------------
-   function fnc_custo_total_mod_prop(p_emp  pp_ordens.empresa%type
-                                    ,p_fil  pp_ordens.filial%type
-                                    ,p_prop pp_contratos.proposta%type)
-      return oc_orcam_prod.custo_prod%type is
-   
-      cursor cr is
-         select sum(oc_util.fnc_custo_total_mod(it.id_orcamprod))
-           from oc_prop_item      it
-              , oc_proposta       prop
-          where it.empresa = p_emp
-            and prop.cd_prop = p_prop
-            and it.seq_ocprop = prop.seq_ocprop
-            and prop.revisao = (select max(prop2.revisao)
-                                 from oc_proposta prop2
-                                 where prop2.cd_prop = prop.cd_prop);
-   
-      v_ret oc_orcam_prod.custo_prod%type;
-   begin
-   
-      open cr;
-      fetch cr
-         into v_ret;
-      close cr;
-   
-      return v_ret;
-   end;   
 end oc_util;
 /
