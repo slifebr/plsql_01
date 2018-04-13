@@ -271,7 +271,7 @@ create or replace package oc_util is
    function fnc_custo_total_mod_prop(p_emp  pp_ordens.empresa%type
                                     ,p_fil  pp_ordens.filial%type
                                     ,p_prop pp_contratos.proposta%type)
-      return oc_orcam_prod.custo_prod%type;      
+      return oc_orcam_prod.custo_prod%type;
 end;
 /
 create or replace package body oc_util is
@@ -1345,7 +1345,7 @@ create or replace package body oc_util is
          select c.id_orcamprod
                ,sum(a.custo_unit * decode(lower(a.unidade),
                                           'kg',
-                                          a.peso_bruto,
+                                          decode(nvl(a.peso_bruto,0),0,a.qtde,a.peso_bruto),
                                           a.qtde) * b.qtde) custo_mp
                ,sum((case
                        when nvl(rendimento,
@@ -2590,10 +2590,10 @@ create or replace package body oc_util is
    
       cursor cr is
          select sum((it.qtde * it.custo_unit) / fnc_preco_venda_prop(a.cd_prop)) /*sum(sum(case when nvl(it.valor_neg,0) > 0 then
-                                                                                                                                                               it.valor_neg
-                                                                                                                                                            else
-                                                                                                                                                               (it.qtde * it.preco_unit)
-                                                                                                                                                            end)) over()*/
+                                                                                                                                                                              it.valor_neg
+                                                                                                                                                                           else
+                                                                                                                                                                              (it.qtde * it.preco_unit)
+                                                                                                                                                                           end)) over()*/
                 * 100 fator_custo_prop
            from oc_proposta  a
                ,oc_prop_item it
@@ -3047,8 +3047,8 @@ create or replace package body oc_util is
       cursor cr is
          select sum(oc_util.fnc_custo_total_material(it.id_orcamprod))
            from oc_prop_item_opos op
-              , oc_prop_item      it
-              
+               ,oc_prop_item      it
+         
           where op.empresa = p_emp
             and op.filial = p_fil
             and op.opos = p_opos
@@ -3073,14 +3073,15 @@ create or replace package body oc_util is
    
       cursor cr is
          select sum(oc_util.fnc_custo_total_material(it.id_orcamprod))
-           from oc_prop_item      it
-              , oc_proposta      prop
+           from oc_prop_item it
+               ,oc_proposta  prop
           where it.empresa = p_emp
             and prop.cd_prop = p_prop
             and it.seq_ocprop = prop.seq_ocprop
-            and prop.revisao = (select max(prop2.revisao)
-                                 from oc_proposta prop2
-                                 where prop2.cd_prop = prop.cd_prop);
+            and prop.revisao =
+                (select max(prop2.revisao)
+                   from oc_proposta prop2
+                  where prop2.cd_prop = prop.cd_prop);
    
       v_ret oc_orcam_prod.custo_prod%type;
    begin
@@ -3102,11 +3103,11 @@ create or replace package body oc_util is
       cursor cr is
          select sum(oc_util.fnc_custo_total_mod(it.id_orcamprod))
            from oc_prop_item_opos op
-              , oc_prop_item      it
+               ,oc_prop_item      it
           where op.empresa = p_emp
             and op.filial = p_fil
             and op.opos = p_opos
-             and it.seq_ocproit = op.seq_ocproit;
+            and it.seq_ocproit = op.seq_ocproit;
    
       v_ret oc_orcam_prod.custo_prod%type;
    begin
@@ -3118,8 +3119,8 @@ create or replace package body oc_util is
    
       return v_ret;
    end;
-   
---|------------------------------------------------------------------------
+
+   --|------------------------------------------------------------------------
    --| Custo total MOD por PROPOSTA
    --|------------------------------------------------------------------------
    function fnc_custo_total_mod_prop(p_emp  pp_ordens.empresa%type
@@ -3129,14 +3130,15 @@ create or replace package body oc_util is
    
       cursor cr is
          select sum(oc_util.fnc_custo_total_mod(it.id_orcamprod))
-           from oc_prop_item      it
-              , oc_proposta       prop
+           from oc_prop_item it
+               ,oc_proposta  prop
           where it.empresa = p_emp
             and prop.cd_prop = p_prop
             and it.seq_ocprop = prop.seq_ocprop
-            and prop.revisao = (select max(prop2.revisao)
-                                 from oc_proposta prop2
-                                 where prop2.cd_prop = prop.cd_prop);
+            and prop.revisao =
+                (select max(prop2.revisao)
+                   from oc_proposta prop2
+                  where prop2.cd_prop = prop.cd_prop);
    
       v_ret oc_orcam_prod.custo_prod%type;
    begin
@@ -3147,6 +3149,6 @@ create or replace package body oc_util is
       close cr;
    
       return v_ret;
-   end;   
+   end;
 end oc_util;
 /

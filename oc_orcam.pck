@@ -25,10 +25,11 @@ create or replace package oc_orcam is
    -------------------------------------------------------------------------------------------
    procedure perdida(p_seq oc_proposta.seq_ocprop%type);
    ---------------------------------------------------------------------------------------------
-   procedure gerar_opos(p_emp   cd_empresas.empresa%type
-                       ,p_fil   cd_filiais.filial%type
-                       ,p_seq   oc_proposta.seq_ocprop%type
-                       ,p_todos char);
+   procedure gerar_opos(p_emp      cd_empresas.empresa%type
+                       ,p_fil      cd_filiais.filial%type
+                       ,p_seq      oc_proposta.seq_ocprop%type
+                       ,p_todos    char
+                       ,p_montagem char);
    ---------------------------------------------------------------------------------------------
    procedure gerar_opos(p_emp cd_empresas.empresa%type
                        ,p_fil cd_filiais.filial%type
@@ -131,7 +132,8 @@ create or replace package oc_orcam is
    --/ GERAR TEMP RESUMO ABC DE PRODUTOS NO ORCTO
    --/--------------------------------------------------------------------------
 
-   procedure gerar_resumo_orcto_abc(p_id oc_orcam_venda.id_orcamvenda%type, p_sec char default 'N');
+   procedure gerar_resumo_orcto_abc(p_id  oc_orcam_venda.id_orcamvenda%type
+                                   ,p_sec char default 'N');
 end oc_orcam;
 /
 create or replace package body oc_orcam is
@@ -176,36 +178,36 @@ create or replace package body oc_orcam is
       --/ estrutura
       cursor cri(p_itm oc_prop_item.seq_ocproit%type) is
          select /*seq_ocproites
-                                                                     ,seq_ocproit
-                                                                     ,item
-                                                                     ,descricao
-                                                                     ,complemento
-                                                                     ,empresa
-                                                                     ,produto
-                                                                     ,qtd
-                                                                     ,unidade
-                                                                     ,valor_unit*/
+                                                                                                ,seq_ocproit
+                                                                                                ,item
+                                                                                                ,descricao
+                                                                                                ,complemento
+                                                                                                ,empresa
+                                                                                                ,produto
+                                                                                                ,qtd
+                                                                                                ,unidade
+                                                                                                ,valor_unit*/
           *
            from oc_prop_item_estr a
           where a.seq_ocproit = p_itm;
       --/ Inclus?es
       cursor crin(p_itm oc_prop_item.seq_ocproit%type) is
          select /*seq_ocproitin
-                                                                     ,seq_ocproit
-                                                                     ,item
-                                                                     ,descricao
-                                                                     ,complemento
-                                                                     ,vl_incl*/
+                                                                                                ,seq_ocproit
+                                                                                                ,item
+                                                                                                ,descricao
+                                                                                                ,complemento
+                                                                                                ,vl_incl*/
           *
            from oc_prop_item_incl a
           where a.seq_ocproit = p_itm;
    
       cursor cre(p_itm oc_prop_item.seq_ocproit%type) is
          select /*a.seq_ocproitex
-                                                                     ,seq_ocproit
-                                                                     ,item
-                                                                     ,descricao
-                                                                     ,complemento*/
+                                                                                                ,seq_ocproit
+                                                                                                ,item
+                                                                                                ,descricao
+                                                                                                ,complemento*/
           *
            from oc_prop_item_excl a
           where a.seq_ocproit = p_itm;
@@ -1139,10 +1141,199 @@ create or replace package body oc_orcam is
    
    end;
    ---------------------------------------------------------------------------------------------
-   procedure gerar_opos(p_emp   cd_empresas.empresa%type
-                       ,p_fil   cd_filiais.filial%type
-                       ,p_seq   oc_proposta.seq_ocprop%type
-                       ,p_todos char)
+   procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
+                                ,p_fil      cd_filiais.filial%type
+                                ,p_seq      oc_proposta.seq_ocprop%type
+                                ,p_contrato pp_contratos.contrato%type) is
+   --/ contrato
+   cursor cr is
+    select a.seq_ocprop
+      ,b.seq_ocproit
+      ,b.contrato
+      , a.cd_ocmerc mercado
+      ,3 classe  --/ MONTAGEM NO CAMPO
+      ,27752 produto
+      ,'MONTAGEM MECANICA' descricao
+      ,sum(b.qtde * (nvl(b.peso_unit,
+                         0))) peso
+      ,max(trunc(b.dt_aprov)) dt_aprov
+      ,max(b.prazo_entr) prazo_entr
+      
+
+  from oc_proposta  a
+      ,oc_prop_item b
+      ,oc_produto   c
+ where a.seq_ocprop = b.seq_ocprop
+   and b.seq_ocprop = p_seq
+   and b.contrato  = P_CONTRATO
+   and c.codigo(+) = b.produto_oc
+   GROUP BY a.seq_ocprop
+      ,b.seq_ocproit
+      ,b.contrato
+      , a.cd_ocmerc;
+          
+   --/ cursor gera codigo op/os incrementa por classe
+      cursor cr2(p_cl number) is
+         select max(nvl(to_number(substr(ordem,
+                                         6,
+                                         3)),
+                        0)) conta
+           from pp_ordens
+          where substr(ordem,
+                       1,
+                       1) = p_cl;
+      
+      --/origem
+      cursor cr3 is
+         select firma from cd_firmas where usuario = user;
+   
+      --/ variaveis
+      v_msk_titulo pp_ordens.msk_titulo%type;
+      v_opos       pp_ordens.ordem%type;
+      v_tipo       pp_ordens.tipo%type;
+      v_versao     cg_ccusto.versao%type;
+      v_ccusto     cg_ccusto.ccusto%type;
+      v_espec      pp_ordens.especif_serv%type;
+      v_conta      number(3);
+      v_origem     number(9);
+      v_gerou_op   boolean;
+   
+   begin
+      v_tipo       := 'S';
+      v_versao     := 1;
+      v_ccusto     := '5.01';
+      v_msk_titulo := '9.99.99.99';
+      v_espec      := 'F';
+   
+      open cr3;
+      fetch cr3
+         into v_origem;
+      close cr3;
+     
+      for reg in cr loop
+      --/definição do numero da op
+       
+         open cr2(reg.classe);
+         fetch cr2
+            into v_conta;
+         close cr2;
+      
+         v_opos := reg.classe || '.' || to_char(reg.dt_aprov,
+                                                'rr') || '.' ||
+                   lpad(nvl(v_conta,
+                            0) + 1,
+                        3,
+                        '0');
+
+      --Raise_Application_Error(-20101, v_Opos);
+      insert into pp_ordens
+         (empresa
+         ,filial
+         ,ordem
+         ,numero
+         ,tipo
+         ,produto
+         ,contrato
+         ,descricao
+         ,criacao
+         ,quantidade
+         ,origem
+         ,peso
+         ,usr_criacao
+         ,encerramento
+         ,usr_encerramento
+         ,data_entrega
+         ,peso_entrega
+         ,vl_total
+         ,vl_ordem
+         ,vl_ipi
+         ,vl_icms
+         ,vl_iss
+         ,vl_pis
+         ,vl_cofins
+         ,vl_ret_inss
+         ,msk_titulo
+         ,grupov
+         ,status
+         ,vl_comissao
+         ,especif_serv
+         ,data_contratual
+         ,vl_ret_irrf
+         ,vl_ret_csll
+         ,vl_ret_pis
+         ,vl_ret_cofins
+         ,area_res
+         ,est_cred
+         ,prazo_fabrica
+         ,ordem01
+         ,versao
+         ,ccusto
+         ,recnoib
+         ,tipox
+         ,fator_unv
+         )
+      values
+         (p_emp
+         ,p_fil
+         ,v_opos
+         ,v_opos
+         ,v_tipo
+         ,reg.produto
+         ,p_contrato
+         ,substr(reg.descricao,
+                 1,
+                 200)
+         ,trunc(sysdate)
+         ,1 --reg.qtde
+         ,v_origem
+         ,0 --peso
+         ,user
+         ,null
+         ,null
+         ,reg.prazo_entr
+         ,round(reg.peso,
+                3)
+         ,0
+         ,0
+         ,0
+         ,0
+         ,null
+         ,null
+         ,null
+         ,null
+         ,v_msk_titulo
+         ,reg.mercado
+         ,'A'
+         ,null
+         ,v_espec
+         ,reg.dt_aprov
+         ,null
+         ,null
+         ,null
+         ,null
+         ,null
+         ,null
+         ,reg.prazo_entr
+         ,null
+         ,v_versao
+         ,v_ccusto
+         ,null
+         ,'M'
+         ,round(reg.peso,
+                3)
+         );
+      --/
+
+   
+
+     end loop;
+   end;
+   ---------------------------------------------------------------------------------------------
+   procedure gerar_opos(p_emp      cd_empresas.empresa%type
+                       ,p_fil      cd_filiais.filial%type
+                       ,p_seq      oc_proposta.seq_ocprop%type
+                       ,p_todos    char
+                       ,p_montagem char)
    
       --
     is
@@ -5121,7 +5312,8 @@ create or replace package body oc_orcam is
    --/ GERAR TEMP RESUMO ABC DE PRODUTOS NO ORCTO
    --/--------------------------------------------------------------------------
 
-   procedure gerar_resumo_orcto_abc(p_id oc_orcam_venda.id_orcamvenda%type, p_sec char default 'N') is
+   procedure gerar_resumo_orcto_abc(p_id  oc_orcam_venda.id_orcamvenda%type
+                                   ,p_sec char default 'N') is
       cursor cr is
          select id_orcamvenda
                ,orcto
@@ -5139,10 +5331,10 @@ create or replace package body oc_orcam is
                ,custo_rend
                ,rendimento
                ,a.origem_produto
-               
+         
            from voc_orcto_custo_abc a
           where a.id_orcamvenda = p_id
-          and (p_sec = 'S' or a.secundario = 'N');
+            and (p_sec = 'S' or a.secundario = 'N');
    begin
    
       delete toc_orcto_custo_abc;
