@@ -28,10 +28,11 @@ create or replace package oc_orcam is
    procedure gerar_opos(p_emp      cd_empresas.empresa%type
                        ,p_fil      cd_filiais.filial%type
                        ,p_seq      oc_proposta.seq_ocprop%type
+                       ,p_seqit    oc_prop_item.seq_ocproit%type
                        ,p_todos    char
                        ,p_montagem char);
    ---------------------------------------------------------------------------------------------
-   procedure gerar_opos(p_emp cd_empresas.empresa%type
+   procedure gerar_opos2(p_emp cd_empresas.empresa%type
                        ,p_fil cd_filiais.filial%type
                        ,p_seq oc_proposta.seq_ocprop%type);
    ---------------------------------------------------------------------------------------------                       
@@ -1141,14 +1142,14 @@ create or replace package body oc_orcam is
    
    end;
    ---------------------------------------------------------------------------------------------
-   procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
+procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                                 ,p_fil      cd_filiais.filial%type
                                 ,p_seq      oc_proposta.seq_ocprop%type
                                 ,p_contrato pp_contratos.contrato%type) is
    --/ contrato
    cursor cr is
     select a.seq_ocprop
-      ,b.seq_ocproit
+     -- ,b.seq_ocproit
       ,b.contrato
       , a.cd_ocmerc mercado
       ,3 classe  --/ MONTAGEM NO CAMPO
@@ -1168,7 +1169,7 @@ create or replace package body oc_orcam is
    and b.contrato  = P_CONTRATO
    and c.codigo(+) = b.produto_oc
    GROUP BY a.seq_ocprop
-      ,b.seq_ocproit
+     -- ,b.seq_ocproit
       ,b.contrato
       , a.cd_ocmerc;
           
@@ -1203,7 +1204,7 @@ create or replace package body oc_orcam is
       v_versao     := 1;
       v_ccusto     := '5.01';
       v_msk_titulo := '9.99.99.99';
-      v_espec      := 'F';
+      v_espec      := 'S';
    
       open cr3;
       fetch cr3
@@ -1327,11 +1328,12 @@ create or replace package body oc_orcam is
    
 
      end loop;
-   end;
-   ---------------------------------------------------------------------------------------------
-   procedure gerar_opos(p_emp      cd_empresas.empresa%type
+   end; 
+ ---------------------------------------------------------------------------------------------
+  procedure gerar_opos(p_emp      cd_empresas.empresa%type
                        ,p_fil      cd_filiais.filial%type
                        ,p_seq      oc_proposta.seq_ocprop%type
+                       ,p_seqit    oc_prop_item.seq_ocproit%type
                        ,p_todos    char
                        ,p_montagem char)
    
@@ -1397,11 +1399,39 @@ create or replace package body oc_orcam is
                ,oc_produto   c
           where a.seq_ocprop = b.seq_ocprop
             and b.seq_ocprop = p_seq
+            and (p_seqit is null or b.seq_ocproit = p_seqit)
             and b.contrato is not null
-            and b.status <> 'S'
+            --and b.status <> 'S'
+            and not exists (select 1 from oc_prop_item_opos ios where ios.seq_ocproit = b.seq_ocproit)
             and c.codigo(+) = b.produto_oc
           order by b.item;
    
+     cursor crTotal is
+        select sum(b.qtde) qte
+              ,sum(b.qtde * (nvl(b.peso_unit,
+                                 0))) peso
+              ,
+               
+               min(trunc(b.dt_aprov)) dt_aprov
+              ,min(b.prazo_entr) prazo_entr
+              ,sum(b.valor_neg) valor_neg
+              ,sum((nvl(b.aliq_icms,
+                        0) * b.valor_neg / 100)) valor_icms
+              ,sum((nvl(b.aliq_ipi,
+                        0) * b.valor_neg / 100)) valor_ipi
+
+          from oc_proposta  a
+              ,oc_prop_item b
+              ,oc_produto   c
+         where a.seq_ocprop = b.seq_ocprop
+           and b.seq_ocprop = p_seq
+           and b.contrato is not null
+           and not exists (select 1
+                  from oc_prop_item_opos ios
+                 where ios.seq_ocproit = b.seq_ocproit)
+           and c.codigo(+) = b.produto_oc
+         order by b.item;
+     
       --/ cursor gera codigo op/os incrementa por classe/ano
       cursor cr1(p_cl  number
                 ,p_ano varchar2) is
@@ -1456,6 +1486,16 @@ create or replace package body oc_orcam is
       v_conta      number(3);
       v_origem     number(9);
       v_gerou_op   boolean;
+      v_contrato   number(9);
+      --/ 16/04/2018 - uma opos para todos os produtos
+      v_qtde number := 0;
+      v_peso number := 0;
+      v_dt_aprov date;
+      v_prazo_entr date;
+      v_valor_neg number := 0;
+      v_valor_icms number := 0;
+      v_valor_ipi number := 0;
+      
    begin
       v_msk_titulo := '9.99.99.99';
       v_espec      := 'F';
@@ -1472,6 +1512,29 @@ create or replace package body oc_orcam is
       for reg in cr loop
          --/ definic?o do tipo de op
          if not v_gerou_op then
+            if p_todos = 'S' then
+                v_gerou_op := true;
+                open crTotal;
+                fetch crTotal into v_qtde,
+                                   v_peso,
+                                   v_dt_aprov,
+                                   v_prazo_entr,
+                                   v_valor_neg,
+                                   v_valor_icms,
+                                   v_valor_ipi;
+                close crTotal;
+                
+            else
+                v_qtde := reg.qtde;
+                v_peso := reg.peso;
+                v_dt_aprov := reg.dt_aprov;
+                v_prazo_entr := reg.prazo_entr;
+                v_valor_neg := reg.valor_neg;
+                v_valor_icms := reg.valor_icms;
+                v_valor_ipi := reg.valor_ipi;
+            end if;
+            
+                             
             if reg.classe in (1,
                               2) then
                v_tipo   := 'P';
@@ -1582,23 +1645,23 @@ create or replace package body oc_orcam is
                        1,
                        200)
                ,trunc(sysdate)
-               ,reg.qtde
+               ,v_qtde
                ,v_origem
-               ,round(reg.peso,
+               ,round(v_peso,
                       3)
                ,user
                ,null
                ,null
-               ,reg.prazo_entr
-               ,round(reg.peso,
+               ,v_prazo_entr
+               ,round(v_peso,
                       3)
-               ,round(reg.valor_neg,
+               ,round(v_valor_neg,
                       3)
-               ,round(reg.valor_neg / reg.qtde,
+               ,round(v_valor_neg / v_qtde,
                       3)
-               ,round(reg.valor_ipi,
+               ,round(v_valor_ipi,
                       3)
-               ,round(reg.valor_icms,
+               ,round(v_valor_icms,
                       3)
                ,null
                ,null
@@ -1609,27 +1672,25 @@ create or replace package body oc_orcam is
                ,'A'
                ,null
                ,v_espec
-               ,reg.dt_aprov
+               ,v_dt_aprov
                ,null
                ,null
                ,null
                ,null
                ,null
                ,null
-               ,reg.prazo_entr
+               ,v_prazo_entr
                ,null
                ,v_versao
                ,v_ccusto
                ,null
                ,'M'
-               ,round(reg.peso,
+               ,round(v_peso,
                       3)
                ,reg.seq_ocproit);
             --/
-            if p_todos = 'S' then
-               v_gerou_op := true;
-            end if;
-         
+
+            v_contrato := reg.contrato;
          end if;
          --/ atualiza item
          update oc_prop_item
@@ -1652,11 +1713,14 @@ create or replace package body oc_orcam is
             ,sysdate);
       
       end loop;
+      if p_montagem = 'S' then
+         gerar_opos_montagem( p_emp, p_fil, p_seq, v_contrato);
+      end if;
       commit;
    end;
 
    ---------------------------------------------------------------------------------------------
-   procedure gerar_opos(p_emp cd_empresas.empresa%type
+   procedure gerar_opos2(p_emp cd_empresas.empresa%type
                        ,p_fil cd_filiais.filial%type
                        ,p_seq oc_proposta.seq_ocprop%type)
    
