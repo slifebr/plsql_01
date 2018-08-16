@@ -73,10 +73,20 @@ create or replace package oc_orcam is
    procedure gerar_espec_tecnica(p_seq   oc_prop_item.seq_ocproit%type
                                 ,p_idprd oc_prop_item.id_orcamprod%type);
    --/------------------------------------------------------------------
-   procedure gerar_eap_op(p_emp cd_empresas.empresa%type
-                         ,p_fil cd_filiais.filial%type
-                         ,p_con pp_contratos.contrato%type);
-
+   procedure gerar_eap_op_orcto(p_emp cd_empresas.empresa%type
+                               ,p_fil cd_filiais.filial%type
+                               ,p_con pp_contratos.contrato%type
+                               ,p_opos pp_ordens.ordem%type);
+  --/------------------------------------------------------------------
+   procedure gerar_eap_op_prop(p_emp cd_empresas.empresa%type
+                              ,p_fil cd_filiais.filial%type
+                              ,p_con pp_contratos.contrato%type
+                              ,p_opos pp_ordens.ordem%type);
+  --/------------------------------------------------------------------                              
+   procedure gerar_eap_op_padrao(p_emp cd_empresas.empresa%type
+                              ,p_fil cd_filiais.filial%type
+                              ,p_opos pp_ordens.ordem%type
+                              ,p_std pp_grupos_cron.id_grupocron%type);                              
    ---------------------------------------------------------------------------------------------
    procedure copiar_partes_proposta(p_prop_orig oc_proposta.seq_ocprop%type
                                    ,p_item_orig oc_prop_item.seq_ocproit%type
@@ -4041,80 +4051,165 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                                         200));
    end;
    --/------------------------------------------------------------------
-   procedure gerar_eap_op(p_emp cd_empresas.empresa%type
-                         ,p_fil cd_filiais.filial%type
-                         ,p_con pp_contratos.contrato%type) is
+   procedure gerar_eap_op_orcto(p_emp cd_empresas.empresa%type
+                               ,p_fil cd_filiais.filial%type
+                               ,p_con pp_contratos.contrato%type
+                               ,p_opos pp_ordens.ordem%type) is
+      cursor cr is
+         select e.ordem
+               ,b.seq_ocproit
+               ,g.seq_ocorcamgr
+               ,lpad(b.item,
+                     2,
+                     '0') || '.' || g.grupo cd_eap
+               ,g.descr descricao
+               ,b.id_orcamprod
+               ,g.custo_prod
+               ,g.custo_mo
+               ,g.peso_bruto
+               ,nvl(g.custo_prod,
+                    0) + nvl(g.custo_mo,
+                             0) custo_total
+               ,g.peso_liq
+               ,g.preco
+               ,g.qtde qtde_gr
+           from oc_prop_item  b
+               ,pp_ordens     e
+               ,oc_orcam_prod f
+               ,oc_orcam_gr   g
+          where e.seq_ocproit = b.seq_ocproit
+            and f.id_orcamprod = b.id_orcamprod
+            and g.id_orcamprod = f.id_orcamprod
+            and e.ordem = p_opos
+            and e.empresa = p_emp
+            and e.filial  = p_fil
+            and b.empresa = p_emp
+            and b.contrato = p_con;
+        
+   
+   begin
+      for reg in cr loop
+         insert into pp_eap_proj
+            (id_eap
+            ,cd_eap
+            ,descricao
+            ,empresa
+            ,filial
+            ,opos
+            ,usu_incl
+            ,dt_incl
+            ,paralelo
+            ,peso_bruto
+            ,peso_liq
+            ,vl_total
+            ,custo_total_prev
+            ,custo_mp_prev
+            ,custo_mod_prev
+            ,leadtime
+            ,dt_prev_ini
+            ,dt_prev_fim
+            ,perc_concl
+            ,cronograma_f
+            ,seq_ocorcamgr)
+         values
+            (pp_eap_proj_seq.nextval
+            ,reg.cd_eap
+            ,reg.descricao
+            ,p_emp
+            ,p_fil
+            ,reg.ordem
+            ,user
+            ,sysdate
+            ,'S' --paralelo
+            ,reg.peso_bruto
+            ,reg.peso_liq
+            ,reg.preco --VL_TOTAL
+            ,reg.custo_total --CUSTO_TOTAL_PREV
+            ,reg.custo_prod --CUSTO_MP_PREV
+            ,reg.custo_mo
+            ,0 --LEADTIME
+            ,null --DT_PREV_INI
+            ,null --DT_PREV_FIM
+            ,0 --PERC_CONCL
+            ,'S' --CRONOGRAMA_F
+            ,reg.seq_ocorcamgr
+             
+             );
+      
+      end loop;
+      commit;
+   end;
+  --/------------------------------------------------------------------
+   procedure gerar_eap_op_prop(p_emp cd_empresas.empresa%type
+                              ,p_fil cd_filiais.filial%type
+                              ,p_con pp_contratos.contrato%type
+                              ,p_opos pp_ordens.ordem%type) is
       cursor cr is
          select e.ordem
                ,c.seq_ocproit
-               ,
-                
-                c.seq_ocproites
-               ,
-                
-                lpad(b.item,
+               ,c.seq_ocproites
+               ,lpad(b.item,
                      2,
                      '0') || '.' || lpad(c.item,
                                          3,
                                          '0') cd_eap
                ,c.descricao
                ,b.id_orcamprod
-               ,g.custo_prod
-               ,g.custo_mo
-               ,g.peso_bruto
-               ,nvl(g.custo_prod,
-                    0) + nvl(g.custo_mo,
-                             0) custo_total
-               ,g.peso_liq
-               ,g.preco
-               ,g.qtde qtde_gr
+               ,(select g.custo_prod
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) custo_prod
+                
+               ,(select g.custo_mo
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) custo_mo
+                
+               ,(select g.peso_bruto
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) peso_bruto
+                
+               ,(select nvl(g.custo_prod,
+                            0) + nvl(g.custo_mo,
+                                     0)
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) custo_total
+               ,(select g.peso_liq
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) peso_liq
+               ,(select g.preco
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) preco
+               ,(select g.qtde
+                   from oc_orcam_gr   g
+                       ,oc_orcam_prod f
+                  where f.id_orcamprod = b.id_orcamprod
+                    and g.id_orcamprod = f.id_orcamprod
+                    and g.grupo = c.item) qtde_gr
            from oc_prop_item      b
                ,oc_prop_item_estr c
                ,pp_ordens         e
-               ,oc_orcam_prod     f
-               ,oc_orcam_gr       g
           where c.seq_ocproit = b.seq_ocproit
             and e.seq_ocproit = b.seq_ocproit
-            and f.id_orcamprod = b.id_orcamprod
-            and g.id_orcamprod = f.id_orcamprod
-            and g.grupo = c.item
-            and b.empresa = p_emp
-            and b.contrato = p_con
-         --and 1=2
-         union
-         select e.ordem
-               ,c.seq_ocproit
-               ,
-                
-                c.seq_ocproites
-               ,
-                
-                lpad(b.item,
-                     2,
-                     '0') || '.' || lpad(c.item,
-                                         3,
-                                         '0') cd_eap
-               ,c.descricao
-               ,b.id_orcamprod
-               ,g.custo_prod
-               ,g.custo_mo
-               ,g.peso_bruto
-               ,nvl(g.custo_prod,
-                    0) + nvl(g.custo_mo,
-                             0) custo_total
-               ,g.peso_liq
-               ,g.preco
-               ,g.qtde qtde_gr
-           from oc_prop_item      b
-               ,oc_prop_item_estr c
-               ,pp_ordens         e
-               ,oc_orcam_prod     f
-               ,oc_orcam_gr       g
-          where c.seq_ocproit = b.seq_ocproit
-            and e.seq_ocproit = b.seq_ocproit
-            and f.id_orcamprod(+) = b.id_orcamprod
-            and g.id_orcamprod(+) = f.id_orcamprod
-            and g.seq_ocorcamgr is null
+            and e.empresa = p_emp
+            and e.filial = p_fil
+            and e.ordem = p_opos
             and b.empresa = p_emp
             and b.contrato = p_con;
    
@@ -4170,6 +4265,56 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
       end loop;
       commit;
    end;
+   
+--/------------------------------------------------------------------
+   procedure gerar_eap_op_padrao(p_emp cd_empresas.empresa%type
+                              ,p_fil cd_filiais.filial%type
+                              ,p_opos pp_ordens.ordem%type
+                              ,p_std pp_grupos_cron.id_grupocron%type) is
+      cursor cr is
+       select atv.codigo
+             ,atv.descricao
+             ,atv.classif
+             ,atv.item
+             ,length(max(item) over()) tamanho
+         from pp_ativ_cron atv
+        where atv.id_grupocron = p_std
+        order by classif, item;
+
+   v_cd_eap pp_eap_proj.cd_eap%type;
+   
+   begin
+      for reg in cr loop
+         v_cd_eap := reg.classif||'.'||lpad(reg.item,
+                     reg.tamanho,
+                     '0');
+                     
+         insert into pp_eap_proj
+            (id_eap
+            ,cd_eap
+            ,descricao
+            ,empresa
+            ,filial
+            ,opos
+            ,usu_incl
+            ,dt_incl
+            ,paralelo
+            )
+         values
+            (pp_eap_proj_seq.nextval
+            ,v_cd_eap
+            ,reg.descricao
+            ,p_emp
+            ,p_fil
+            ,p_opos
+            ,user
+            ,sysdate
+            ,'S' --paralelo
+             );
+      
+      end loop;
+      commit;
+   end;   
    --------------------------------------------------------------------------------------------------
    --/ processo local chamado pela copiar_partes_proposta
    --/-----------------------------------------------------------------------------------------------

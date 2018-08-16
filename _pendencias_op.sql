@@ -1,14 +1,40 @@
-select sum(nvl(pendente,
-               0))
+create or replace view voc_realizado_compra_det as
+select proposta
+      ,contrato
+      ,opos
+      ,produto
+      ,descr_prod
+      ,solcomp
+      ,cotacao
+      ,numero_af
+      ,sum(nvl(pendente,
+               0)) vl_compra
   from --/solicitações pendentes
-       (select opos
+       (select proposta
+              ,contrato
+              ,opos
+              ,produto
+              ,descr_prod
+              ,solcomp
+              ,to_number(null) cotacao
+              ,to_number(null) numero_af
               ,sum(case
                       when saldo > 0 then
                        saldo * ultimo_preco
                       else
                        0
                    end) pendente
-          from (select ir.opos
+          from (select decode(pc.proposta,
+                              null,
+                              'DG.USO.20' || substr(po.ordem,
+                                                    3,
+                                                    2),
+                              pc.proposta) proposta
+                      ,pc.contrato
+                      ,ir.opos
+                      ,ir.num_req solcomp
+                      ,ir.produto
+                      ,prd.descricao descr_prod
                       ,((ir.qtde_req - nvl(ir.qtd_cancel,
                                            0))) -
                        nvl((select sum(cot.qtde - nvl(cot.qtde_dev,
@@ -24,9 +50,20 @@ select sum(nvl(pendente,
                                                   ir.produto) ultimo_preco
                   from co_itens_req ir
                       ,co_requis    r
+                      ,pp_ordens    po
+                      ,pp_contratos pc
+                      ,ce_produtos  prd
                  where ir.empresa = 1 --p_emp
                    and ir.filial = 1 --p_fil
-                      -- and ir.opos = '9.15.201' --'1.17.351'--p_opos
+                   and ir.opos = '9.15.301' --'1.17.351'--p_opos
+                   and pc.empresa = po.empresa
+                   and pc.contrato = po.contrato
+                   and po.empresa = ir.empresa
+                   and po.filial = ir.filial
+                   and po.ordem = ir.opos
+                   and prd.empresa = ir.empresa
+                   and prd.produto = ir.produto
+                      
                    and r.empresa = ir.empresa
                    and r.filial = ir.filial
                    and r.num_req = ir.num_req
@@ -42,15 +79,39 @@ select sum(nvl(pendente,
                                             and s.num_req = ir.num_req
                                             and s.item_req = ir.item_req),
                                          0)) v
-         group by opos
+         group by proposta
+                 ,contrato
+                 ,opos
+                 ,solcomp
+                 ,produto
+                 ,descr_prod
         
         union all --\ cotações pendentes
-        select opos
+        select proposta
+              ,contrato
+              ,opos
+              ,produto
+              ,descr_prod
+              ,solcomp
+              ,cotacao
+              ,to_number(null) numero_af
               ,round(sum((qtde_sol_cot_opos / qtde_sol_cot) * qtde_neg * preco),
                      2) pendente_opos
-          from (select ir.opos opos
-                      ,ic.num_req cotacao
+          from (select decode(pc.proposta,
+                              null,
+                              'DG.USO.20' || substr(po.ordem,
+                                                    3,
+                                                    2),
+                              pc.proposta) proposta
+                      ,pc.contrato
+                      ,ir.opos
+                      ,ir.produto
+                      ,prd.descricao descr_prod
+                      ,ir.num_req solcomp
+                       
+                      ,ic.num_req  cotacao
                       ,ic.item_req item_cot
+                       
                       ,ic.qtde_neg
                       ,solc.qtde qtde_sol_cot_opos
                       ,(select sum(sc2.qtde)
@@ -64,11 +125,21 @@ select sum(nvl(pendente,
                       ,co_itens_cot ic
                       ,co_solcot    solc
                       ,co_itens_req ir
-                
+                      ,pp_ordens    po
+                      ,pp_contratos pc
+                      ,ce_produtos  prd
                  where ic.empresa = i.empresa
                    and ic.filial = i.filial
                    and ic.num_req = i.num_cot
                    and ic.item_req = i.item_cot
+                      
+                   and pc.empresa = po.empresa
+                   and pc.contrato = po.contrato
+                   and po.empresa = ir.empresa
+                   and po.filial = ir.filial
+                   and po.ordem = ir.opos
+                   and prd.empresa = ir.empresa
+                   and prd.produto = ir.produto
                       
                    and ic.escolha = 1
                    and solc.empresa = i.empresa
@@ -90,39 +161,97 @@ select sum(nvl(pendente,
                    and i.empresa = 1 --p_emp
                    and i.filial = 1 -- p_fil
                 ) v2
-         group by opos
+         group by proposta
+                 ,contrato
+                 ,opos
+                 ,produto
+                 ,descr_prod
+                 ,solcomp
+                 ,cotacao
         union all --\ ordens de compra pendentes
-        select iop.opos , sum(co_ordens_utl.saldo_ordem(io.empresa,
+        select decode(pc.proposta,
+                      null,
+                      'DG.USO.20' || substr(po.ordem,
+                                            3,
+                                            2),
+                      pc.proposta) proposta
+              ,pc.contrato
+              ,iop.opos
+              ,io.produto
+              ,prd.descricao descr_prod
+              ,to_number(null) solcomp
+              ,io.num_req cotacao
+              ,o.ordem numero_af
+              ,sum(co_ordens_utl.saldo_ordem(io.empresa,
                                              io.filial,
                                              io.ordem,
-                                             io.item_req) * io.preco * iop.perc / 100) pendente
+                                             io.item_req) * io.preco * iop.perc / 100) pendente --32186,912208 161155,3575935
           from co_itens_ord    io
               ,co_itens_ord_op iop
               ,co_ordens       o
+              ,pp_ordens       po
+              ,pp_contratos    pc
+              ,ce_produtos     prd
          where iop.empresa = io.empresa
            and iop.filial = io.filial
            and iop.ordem = io.ordem
            and iop.item_req = io.item_req
+              
+           and pc.empresa = po.empresa
+           and pc.contrato = po.contrato
+           and po.empresa = iop.empresa
+           and po.filial = iop.filial
+           and po.ordem = iop.opos
+           and prd.empresa = io.empresa
+           and prd.produto = io.produto
+              
            and o.empresa = io.empresa
            and o.filial = io.filial
            and o.ordem = io.ordem
-           and iop.opos =  '9.15.301'--p_opos
-           and iop.empresa = 1--p_emp
-           and iop.filial = 1--p_fil
+           and iop.opos = '9.15.301' --p_opos
+           and iop.empresa = 1 --p_emp
+           and iop.filial = 1 --p_fil
            and (substr(iop.opos,
                        '1') != '9' or
                o.dt_ordem >= trunc(sysdate,
                                     'rr'))
-           and io.qtd - nvl(io.qtd_can,0) > 0 
+           and io.qtd - nvl(io.qtd_can,
+                            0) > 0
            and o.status != 'C'
-           and (io.qtd - nvl(io.qtd_can,0)) > nvl( (select sum(io.qtd) 
-                  from ce_itens_nf it 
-                  where it.empresa = io.empresa 
-                  and it.filial = io.filial 
-                  and it.ordem = io.ordem 
-                  and it.item_req = io.item_req
-                  and it.qtd > nvl((select sum(itd.qtd_dev)
-                                      from ce_itdev_nf itd
-                                      where itd.seq_item = it.id),0)),0)
-                                      group by iop.opos
-)
+           and (io.qtd - nvl(io.qtd_can,
+                             0)) >
+               nvl((select sum(io.qtd)
+                     from ce_itens_nf it
+                    where it.empresa = io.empresa
+                      and it.filial = io.filial
+                      and it.ordem = io.ordem
+                      and it.item_req = io.item_req
+                      and it.qtd > nvl((select sum(itd.qtd_dev)
+                                         from ce_itdev_nf itd
+                                        where itd.seq_item = it.id),
+                                       0)),
+                   0)
+         group by decode(pc.proposta,
+                         null,
+                         'DG.USO.20' || substr(po.ordem,
+                                               3,
+                                               2),
+                         pc.proposta)
+                 ,pc.contrato
+                 ,iop.opos
+                 ,io.produto
+                 ,prd.descricao
+                 ,io.num_req
+                 ,o.ordem)
+group by  proposta
+      ,contrato
+      ,opos
+      ,produto
+      ,descr_prod
+      ,solcomp
+      ,cotacao
+      ,numero_af
+having  sum(nvl(pendente,   0)) > 0     
+
+--grant select on voc_realizado_compra_det to gestao_opr;
+--grant select on voc_realizado_compra_det to gestao_usr;
