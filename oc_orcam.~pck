@@ -1404,7 +1404,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                ,b.perc_csll
                ,b.perc_irrf
                ,b.obs
-               ,b.item
            from oc_proposta  a
                ,oc_prop_item b
                ,oc_produto   c
@@ -1714,20 +1713,14 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
             ,filial
             ,opos
             ,usu_incl
-            ,dt_incl
-            ,proposta
-            ,revisao
-            ,item)
+            ,dt_incl)
          values
             (reg.seq_ocproit
             ,p_emp
             ,p_fil
             ,v_opos
             ,user
-            ,sysdate
-            ,reg.cd_prop
-            ,reg.revisao
-            ,reg.item);
+            ,sysdate);
       
       end loop;
       if p_montagem = 'S' then
@@ -1796,7 +1789,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                ,b.perc_csll
                ,b.perc_irrf
                ,b.obs
-               ,b.item
            from oc_proposta  a
                ,oc_prop_item b
                ,oc_produto   c
@@ -2037,20 +2029,14 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
             ,filial
             ,opos
             ,usu_incl
-            ,dt_incl
-            ,proposta
-            ,revisao
-            ,item)
+            ,dt_incl)
          values
             (reg.seq_ocproit
             ,p_emp
             ,p_fil
             ,v_opos
             ,user
-            ,sysdate
-            ,reg.cd_prop
-            ,reg.revisao
-            ,reg.item);
+            ,sysdate);
       end loop;
       commit;
    end;
@@ -2117,7 +2103,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                ,b.perc_csll
                ,b.perc_irrf
                ,b.obs
-               ,b.item
            from oc_proposta  a
                ,oc_prop_item b
                ,oc_produto   c
@@ -2441,20 +2426,14 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
             ,filial
             ,opos
             ,usu_incl
-            ,dt_incl
-            ,proposta
-            ,revisao
-            ,item)
+            ,dt_incl)
          values
             (reg.seq_ocproit
             ,p_emp
             ,p_fil
             ,v_opos
             ,user
-            ,sysdate
-            ,reg.cd_prop
-            ,reg.revisao
-            ,reg.item);
+            ,sysdate);
       end loop;
       commit;
    end;
