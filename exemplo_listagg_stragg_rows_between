@@ -1,0 +1,26 @@
+select n.id 
+     , n.num_nota
+     ,n.sr_nota
+     , n.cod_fornec
+     --, cd_firmas_utl.nome(n.cod_fornec) razao_social
+     , n.vlr_nota
+     , trunc(n.dt_emissao) dt
+     , listagg(oc.ordem,'-') within group(order by n.id)  over(partition by n.id) af
+     --, stragg(oc.ordem) over()
+     , sum(n.vlr_nota) over(partition by n.num_nota order by n.num_nota,n.sr_nota rows between unbounded preceding and current row) sum_ac_row
+     , sum(n.vlr_nota) over(partition by n.num_nota order by n.num_nota,n.sr_nota rows between unbounded preceding and unbounded following) sum_ac_foll     
+     , sum(n.vlr_nota) over(partition by n.num_nota order by n.num_nota,n.sr_nota rows between 1 preceding and 1 following) sum_ac_fx1     
+     , sum(n.vlr_nota) over(partition by n.num_nota order by n.num_nota,n.sr_nota range between unbounded preceding and current row) sum_range     
+     , sys.STRAGG( n.id || ' - ' ) over() txt
+     , rtrim(listagg (n.id || ' - ' ) within group(order by n.id) over(),'- ') 
+     
+from ce_notas n
+   , fn_tipos_doc d
+   , ce_oc_nf oc
+where n.tipo_doc = d.tipo_doc
+  and d.adiant= 'S'
+ and  n.situacao_nf != 1
+ and not exists (select 1 from ce_itens_nf it where it.id_ce_nota = n.id)
+ and n.dt_emissao >= '01/01/2018'
+ and oc.id_ce_nota  = n.id
+ order by  n.num_nota,n.sr_nota
