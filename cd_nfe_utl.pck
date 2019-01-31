@@ -7573,6 +7573,329 @@ create or replace package body cd_nfe_utl is
       commit;
    
    end;
+   
+   --/-------------------------------------------------------------
+   procedure xml_40_transporte( pp_emp ft_notas.empresa%type
+                               ,pp_fil ft_notas.filial%type
+                               ,pp_nro ft_notas.num_nota%type
+                               ,pp_ser ft_notas.sr_nota%type
+                               ,pp_id  ft_notas.id%type
+                               ,p_ordem in out number) is
+      cursor crTransp is
+        select * from ft_transporte t
+         where t.id_ft_nota = pp_id;
+         
+      cursor crTranspReboque(pl_id ft_transporte.id%type) is
+        select * from ft_transporte_reboque tr
+         where tr.id_ft_transporte = pl_id
+         order by tr.item;   
+        
+      cursor crTranspVolume(pl_id ft_transporte.id%type) is
+        select * from ft_transporte_volume tr
+         where tr.id_ft_transporte = pl_id
+         ;
+   
+   rg_tra     cd_firmas%rowtype;    
+   rg_transp ft_transporte%rowtype;
+   v_nome_transp varchar2(100);
+   v_rntc varchar2(20);
+                                     
+   v_tp_frete char(1);
+   v_linha varchar2(4000);
+   begin
+     /*
+     30/01/2018 -slf
+     alterado para buscar na tabela nfe_transporte
+     */
+     
+     open crTransp;
+     fetch crTransp into rg_transp;
+     close crTransp;
+     
+     if rg_transp.modalidade_frete is not null then
+       v_tp_frete := rg_transp.modalidade_frete;
+     end if;
+     
+      v_linha := '<modFrete>' || v_tp_frete || '</modFrete>';
+      p_ordem := p_ordem + 1;
+      insert into t_nfe
+      values
+         (p_ordem
+         ,v_linha);
+   
+      if rg_transp.cod_transp is not null then
+        
+         select * into rg_tra from cd_firmas where firma = rg_transp.cod_transp;
+
+         v_linha := '<transporta>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         if rg_tra.natureza = 'J' then
+            v_linha := '<CNPJ>' || replace(replace(replace(replace(rg_tra.cgc_cpf,
+                                                                   '-',
+                                                                   ''),
+                                                           '.',
+                                                           ''),
+                                                   '-',
+                                                   ''),
+                                           '/',
+                                           '') || '</CNPJ>';
+         else
+            v_linha := '<CPF>' || replace(replace(replace(replace(rg_tra.cgc_cpf,
+                                                                  '-',
+                                                                  ''),
+                                                          '.',
+                                                          ''),
+                                                  '-',
+                                                  ''),
+                                          '/',
+                                          '') || '</CPF>';
+                                          
+             if rg_transp.motorista is not null then
+                v_nome_transp := trim(rg_transp.motorista);
+             end if;
+
+         end if;
+
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+         if v_nome_transp is null then
+           v_nome_transp := trim(rg_tra.nome);
+         end if;
+         
+         v_linha := '<xNome>' || v_nome_transp || '</xNome>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         if rg_tra.iest is not null then
+            v_linha := '<IE>' || trim(replace(replace(replace(rg_tra.iest,
+                                                              '.',
+                                                              ''),
+                                                      '-',
+                                                      ''),
+                                              '/',
+                                              '')) || '</IE>';
+            p_ordem := p_ordem + 1;
+            insert into t_nfe
+            values
+               (p_ordem
+               ,v_linha);
+
+         end if;
+
+      
+         v_linha := '<xEnder>' || rg_transp.endereco || '</xEnder>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         --v_linha := '<xMun>' || trim(cd_firmas_utl.cidade(rg_tra.firma)) ||
+         v_linha := '<xMun>' || trim(rg_transp.nome_municipio) ||
+                    '</xMun>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         --v_linha := '<UF>' || rg_tra.uf || '</UF>';
+         v_linha := '<UF>' || rg_transp.uf || '</UF>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         v_linha := '</transporta>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+      end if;
+
+   /*
+      if rg_nf.placa_veic is not null and
+         rg_nf.placa_uf is not null then
+    */
+      if rg_transp.placa_veiculo is not null and rg_transp.uf_veiculo is not null then
+         v_linha := '<veicTransp>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         v_linha := '<placa>' || upper(replace(replace(rg_transp.placa_veiculo,
+                                                       '-',
+                                                       ''),
+                                               ' ',
+                                               '')) || '</placa>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         v_linha := '<UF>' || rg_transp.uf_veiculo || '</UF>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+         if trim(rg_transp.rntc_veiculo) is not null then
+            v_rntc := trim(rg_transp.rntc_veiculo);
+         else
+            v_rntc := '000000000';
+         end if;
+         
+         v_linha := '<RNTC>'||v_rntc||'</RNTC>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      
+         v_linha := '</veicTransp>';
+         p_ordem := p_ordem + 1;
+         insert into t_nfe
+         values
+            (p_ordem
+            ,v_linha);
+
+      end if;
+
+     for regVol in crTranspVolume(rg_transp.id) loop
+          v_linha := '<vol>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+
+          
+          v_linha := '<volItem>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+           
+
+          v_linha := '<qVol>' || nvl(regVol.Qtde_Vol_Transportados,
+                                     1) || '</qVol>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+
+       
+          if regVol.Especie_Vol_Transportados is not null then
+             v_linha := '<esp>' || regVol.Especie_Vol_Transportados || '</esp>';
+             p_ordem := p_ordem + 1;
+             insert into t_nfe
+             values
+                (p_ordem
+                ,v_linha);
+
+          end if;
+
+       
+          if regVol.Marca_Vol_Transportados is not null then
+             v_linha := '<marca>' || regVol.Marca_Vol_Transportados || '</marca>';
+             p_ordem := p_ordem + 1;
+             insert into t_nfe
+             values
+                (p_ordem
+                ,v_linha);
+
+          end if;
+
+       
+          if regVol.Numeracao_Vol_Transportados is not null then
+             v_linha := '<nVol>' || regVol.Numeracao_Vol_Transportados || '</nVol>';
+             p_ordem := p_ordem + 1;
+             insert into t_nfe
+             values
+                (p_ordem
+                ,v_linha);
+
+          end if;
+
+       
+          v_linha := '<pesoL>' || trim(replace(to_char(nvl(regVol.Peso_Liquido,
+                                                           0),
+                                                       '9999999999990D000'),
+                                               ',',
+                                               '.')) || '</pesoL>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+
+       
+          v_linha := '<pesoB>' || trim(replace(to_char(nvl(regVol.peso_bruto,
+                                                           0),
+                                                       '9999999999990D000'),
+                                               ',',
+                                               '.')) || '</pesoB>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+
+          v_linha := '</volItem>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+             
+          v_linha := '</vol>';
+          p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+      end loop;
+   
+      v_linha := '</transp>';
+      p_ordem := p_ordem + 1;
+      insert into t_nfe
+      values
+         (p_ordem
+         ,v_linha);
+
+        
+   end;
+   
    --------------------------------------------------------------------------------
    procedure xml_40(pp_emp ft_notas.empresa%type
                    ,pp_fil ft_notas.filial%type
@@ -7624,13 +7947,17 @@ create or replace package body cd_nfe_utl is
                ,ce_itens_nf i
           where i.id = p_id
             and n.id = i.id_ce_nota;
-   
+            
+
+      
       v_ref    number(10);
       v_nf_ref ce_notas.chave_nfe%type;
    
       rg_nf      ft_notas%rowtype;
       rg_emi     cd_firmas%rowtype;
       rg_tra     cd_firmas%rowtype;
+     
+      
       v_uf_ibge  cd_uf.cd_ibge%type;
       v_linha    varchar2(4000);
       v_desc_cfo ft_cfo.descricao%type;
@@ -10899,7 +11226,15 @@ create or replace package body cd_nfe_utl is
       values
          (v_ordem
          ,v_linha);
-   
+         
+      --/ 30/01/2019   
+      xml_40_transporte(pp_emp 
+                       ,pp_fil 
+                       ,pp_nro 
+                       ,pp_ser 
+                       ,pp_id
+                       ,v_ordem  );
+      /*
       v_linha := '<transp>';
       v_ordem := v_ordem + 1;
       insert into t_nfe
@@ -10907,6 +11242,19 @@ create or replace package body cd_nfe_utl is
          (v_ordem
          ,v_linha);
    
+     
+     --/30/01/2018 -slf
+     --/alterado para buscar na tabela nfe_transporte
+     
+     
+     open crTransp;
+     fetch crTransp into rg_transp;
+     close crTransp;
+     
+     if rg_transp.modalidade_frete is not null then
+       v_tp_frete := rg_transp.modalidade_frete;
+     end if;
+     
       v_linha := '<modFrete>' || v_tp_frete || '</modFrete>';
       v_ordem := v_ordem + 1;
       insert into t_nfe
@@ -11051,14 +11399,7 @@ create or replace package body cd_nfe_utl is
       values
          (v_ordem
          ,v_linha);
-      /*
-      v_linha := '<volItem>';
-      v_ordem := v_ordem + 1;
-      insert into t_nfe
-      values
-         (v_ordem
-         ,v_linha);
-       */
+
       v_linha := '<qVol>' || nvl(rg_nf.vol_qtd,
                                  1) || '</qVol>';
       v_ordem := v_ordem + 1;
@@ -11129,7 +11470,10 @@ create or replace package body cd_nfe_utl is
       values
          (v_ordem
          ,v_linha);
-   
+      */
+      --/------------------------------------------------------
+      --/ parcelas
+      --/------------------------------------------------------
       v_temparc := 'N';
       open cr_ptem;
       fetch cr_ptem
@@ -11556,7 +11900,7 @@ create or replace package body cd_nfe_utl is
       mod - Modelo do Documento Fiscal;
       serie - Série do Documento Fiscal;
       nNF - Número do Documento Fiscal;
-      tpEmis – forma de emissão da NF-e;
+      tpEmis ¿ forma de emissão da NF-e;
       cNF - Código Numérico que compõe a Chave de Acesso;
       cDV - Dígito Verificador da Chave de Acesso.
       
