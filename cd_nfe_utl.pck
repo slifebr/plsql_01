@@ -4762,7 +4762,7 @@ create or replace package body cd_nfe_utl is
                        '</refNFe>';
             v_ref   := 1;
          end if;
-         --raise_application_error(-20101,v_nf_ref);
+         raise_application_error(-20101,rgi.seq_origem || ' - ' ||v_nf_ref);
       end loop;
       if v_ref > 0 then
          v_linha := v_linha || chr(10) || '</NFref>';
@@ -7597,6 +7597,8 @@ create or replace package body cd_nfe_utl is
    
    rg_tra     cd_firmas%rowtype;    
    rg_transp ft_transporte%rowtype;
+   rg_reboque ft_transporte_reboque%rowtype;
+   
    v_nome_transp varchar2(100);
    v_rntc varchar2(20);
                                      
@@ -7788,9 +7790,69 @@ create or replace package body cd_nfe_utl is
             ,v_linha);
 
       end if;
+      
+     rg_reboque := null;
+      
+     open crTranspReboque(rg_transp.id);
+     fetch crTranspReboque into rg_reboque;
+     close crTranspReboque;
+     if rg_reboque.id is  not null then
+        v_linha := '<reboque>';
+        p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+     end if;
 
+     for regReb in crTranspReboque(rg_transp.id) loop
+        v_linha := '<reboqueItem>'; 
+        p_ordem := p_ordem + 1;
+        insert into t_nfe
+        values
+           (p_ordem
+           ,v_linha);
+                     
+        v_linha := '<placa_rebtransp>' || regReb.Placa_Reboque ||'</placa_rebtransp>';
+        p_ordem := p_ordem + 1;
+        insert into t_nfe
+        values
+           (p_ordem
+           ,v_linha);  
+                       
+        v_linha := '<UF_rebtransp>' || regReb.Uf_Reboque ||'</UF_rebtransp>';
+        p_ordem := p_ordem + 1;
+        insert into t_nfe
+        values
+           (p_ordem
+           ,v_linha);        
+        v_linha := '<RNTC_rebtransp>' || regReb.Rntc_Reboque ||'</RNTC_rebtransp>';
+        p_ordem := p_ordem + 1;
+        insert into t_nfe
+        values
+           (p_ordem
+           ,v_linha);  
+                     
+        v_linha := '</reboqueItem>'; 
+        p_ordem := p_ordem + 1;
+        insert into t_nfe
+        values
+           (p_ordem
+           ,v_linha);                                          
+     end loop;
+     
+     if rg_reboque.id is  not null then
+        v_linha := '</reboque>';
+        p_ordem := p_ordem + 1;
+          insert into t_nfe
+          values
+             (p_ordem
+             ,v_linha);
+     end if;
+     
      for regVol in crTranspVolume(rg_transp.id) loop
           v_linha := '<vol>';
+          
           p_ordem := p_ordem + 1;
           insert into t_nfe
           values
@@ -7941,14 +8003,22 @@ create or replace package body cd_nfe_utl is
       cursor cr_m is
          select * from ft_msgs_nf a where a.id_ft_nota = pp_id;
    
-      cursor cr_ref(p_id ce_itens_nf.id%type) is
+      -- referenciadas: origem na recepcao
+      cursor cr_refR(p_id ce_itens_nf.id%type) is
          select n.chave_nfe
            from ce_notas    n
                ,ce_itens_nf i
           where i.id = p_id
             and n.id = i.id_ce_nota;
             
-
+      -- referenciadas: origem na emissao
+       cursor cr_refS(p_id ce_itens_nf.id%type) is     
+                SELECT N.Chave_Nfe 
+                  FROM ft_notas N 
+                     , ft_itens_nf i
+                 WHERE i.id = p_id
+                   and n.id = i.id_ft_nota;
+                   
       
       v_ref    number(10);
       v_nf_ref ce_notas.chave_nfe%type;
@@ -8399,6 +8469,7 @@ create or replace package body cd_nfe_utl is
                      and num_nota = ite.doc_origem
                      and sr_nota = ite.ser_origem
                      and parte = 0;
+                     
                   select firma
                     into v_firma_ori
                     from cd_firmas
@@ -8626,17 +8697,26 @@ create or replace package body cd_nfe_utl is
          end if;
       
          v_nf_ref := null;
-      
-         open cr_ref(rgi.seq_origem);
-         fetch cr_ref
-            into v_nf_ref;
-         close cr_ref;
-         if v_nf_ref is not null then
-            v_linha := v_linha || chr(10) || '<refNFe>' || v_nf_ref ||
-                       '</refNFe>';
-            v_ref   := 1;
+         if rg_opr.nf_origem = 'S' then
+           if rg_opr.rm_origem = 'S' then
+             open cr_refR(rgi.seq_origem);
+             fetch cr_refR
+                into v_nf_ref;
+             close cr_refR;
+           else
+             open cr_refS(rgi.seq_origem);
+             fetch cr_refS
+                into v_nf_ref;
+             close cr_refS;
+           end if;
+           if v_nf_ref is not null then
+              v_linha := v_linha || chr(10) || '<refNFe>' || v_nf_ref ||
+                         '</refNFe>';
+              v_ref   := 1;
+           end if;
          end if;
-         --raise_application_error(-20101,v_nf_ref);
+         --raise_application_error(-20102,rgi.seq_origem ||' - '||v_nf_ref);
+         
       end loop;
       if v_ref > 0 then
          v_linha := v_linha || chr(10) || '</NFref>';
@@ -11228,12 +11308,14 @@ create or replace package body cd_nfe_utl is
          ,v_linha);
          
       --/ 30/01/2019   
+      
       xml_40_transporte(pp_emp 
                        ,pp_fil 
                        ,pp_nro 
                        ,pp_ser 
                        ,pp_id
                        ,v_ordem  );
+                       
       /*
       v_linha := '<transp>';
       v_ordem := v_ordem + 1;
