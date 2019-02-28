@@ -11214,14 +11214,18 @@ create or replace package body cd_nfe_utl is
       values
          (v_ordem
          ,v_linha);
-      /*
-      <vIPIDevol>0.00</vIPIDevol>
-      */
-      v_linha := '<vIPIDevol>' || trim(replace(to_char(nvl(rg_nf.vl_ipi,
-                                                           0),
-                                                       '9999999999990D00'),
-                                               ',',
-                                               '.')) || '</vIPIDevol>';
+      
+      --/ verifica se é devolucao
+      if rg_opr.devolucao = 'S' then
+          v_linha := '<vIPIDevol>' || trim(replace(to_char(nvl(rg_nf.vl_ipi,
+                                                               0),
+                                                           '9999999999990D00'),
+                                                   ',',
+                                                   '.')) || '</vIPIDevol>';
+      else
+        v_linha := '<vIPIDevol>0.00</vIPIDevol>';
+      end if;
+      
       v_ordem := v_ordem + 1;
       insert into t_nfe
       values

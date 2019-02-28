@@ -6569,14 +6569,18 @@ create or replace package body fs_sped_efd is
                    3) SALDO_ATUAL
         from TMP_SPED_BLOCO_0200 a
         order by to_number(a.cod_item) ;
-
+       
+  v_IND_EST number(1) := 0; --Estoque de propriedade do informante e em seu poder;
+  V_COD_PART  number; -- tera valor somente se v_ind_est for diferente de ZERO
   begin
     for reg in cr loop
       vg_registro := 'K200';
       vg_linha    := vg_sep || vg_registro || vg_sep;
       vg_linha    := vg_linha || to_char(p_dt_ref, 'DDMMRRRR') || vg_sep;
       vg_linha    := vg_linha || reg.cod_item || vg_sep;
-      vg_linha    := vg_linha || reg.saldo_atual || vg_sep || vg_crlf;
+      vg_linha    := vg_linha || reg.saldo_atual || vg_sep;
+      vg_linha    := vg_linha || v_ind_est || vg_sep; 
+      vg_linha    := vg_linha || V_COD_PART || vg_sep || vg_crlf;
     
       pl_gera_linha;
       vg_conta_k := vg_conta_k + 1;
