@@ -3584,6 +3584,7 @@ v_aux2 := 'estoque_nf:08';
    v_id_vol number(9);
    v_mod_frete ft_transporte.modalidade_frete%type;
    v_achou number(9) := 0;
+   v_aux varchar2(100);
    
    begin
      open crBusca;
@@ -3594,6 +3595,7 @@ v_aux2 := 'estoque_nf:08';
        return;
      end if;
      
+     v_aux := '01-tranporte - le nota ' ||num || '-'|| SER;
       --| Le a nota
       SELECT *
         INTO reg
@@ -3610,7 +3612,7 @@ v_aux2 := 'estoque_nf:08';
        else
          v_mod_frete := 1;
       end if;
-      
+      v_aux := '02-tranporte - insert ft_tranporte';
       insert into ft_transporte(id,
                                 id_ft_nota,
                                 modalidade_frete,
@@ -3663,7 +3665,8 @@ v_aux2 := 'estoque_nf:08';
                                   VAGAO_REBOQUE,
                                   BALSA_REBOQUE)   
         */
-        select ft_transporte_volume_seq.nextval into v_id_vol from dual;                                  
+        select ft_transporte_volume_seq.nextval into v_id_vol from dual;     
+        v_aux := '03-tranporte - insert FT_TRANSPORTE_VOLUME';                             
         INSERT INTO FT_TRANSPORTE_VOLUME(ID,
                                          ID_FT_TRANSPORTE,
                                          QTDE_VOL_TRANSPORTADOS,
@@ -3684,7 +3687,9 @@ v_aux2 := 'estoque_nf:08';
                                          null --NUMERO_LACRES
                                          );                                                                                            
                            
-
+   exception
+     when others then
+       raise_application_error (-20102,v_aux);
    end;
    
    --------------------------------------------------------------------------------
@@ -4165,7 +4170,8 @@ v_aux2 := 'estoque_nf:08';
                 reg.parte,
                 NULL,
                 v_doc_origem,
-                reg.firma
+                reg.firma,
+                null
                 );
          END IF;
 
@@ -6081,7 +6087,7 @@ v_aux := 'PASSO:01';
      v_aux := 'PASSO:11-transporte';   
      transporte_nf(emp,
                fil,
-               num,
+               nnf,
                ser);
       
      v_aux := 'PASSO:11-estoque';     
@@ -6270,7 +6276,7 @@ v_aux := 'PASSO:01';
            raise_application_error(-20101,
                                           v_aux||' - ' || substr(sqlerrm,1,200)
                                           ); 
-    */                                   
+  */                                    
    END;
 
    --------------------------------------------------------------------------------

@@ -7614,6 +7614,13 @@ create or replace package body cd_nfe_utl is
      fetch crTransp into rg_transp;
      close crTransp;
      
+      v_linha := '<transp>';
+      p_ordem := p_ordem + 1;
+      insert into t_nfe
+      values
+         (p_ordem
+         ,v_linha);   
+           
      if rg_transp.modalidade_frete is not null then
        v_tp_frete := rg_transp.modalidade_frete;
      end if;
