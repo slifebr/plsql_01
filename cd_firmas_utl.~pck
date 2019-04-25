@@ -21,9 +21,7 @@ create or replace package cd_firmas_utl is
                               wnds,
                               wnps);
    --------------------------------------------------------------------------------
-   function is_filial(p_firm in cd_firmas.firma%type ) return boolean;        
-   --------------------------------------------------------------------------------
-   function is_funcionario(p_firm in cd_firmas.firma%type ) return VARCHAR2;                         
+   function is_filial(p_firm in cd_firmas.firma%type ) return boolean;                              
   --------------------------------------------------------------------------------
    function firma_filial(emp in cd_filiais.empresa%type,
                          fil in cd_filiais.filial%type) return cd_firmas.firma%type;
@@ -54,12 +52,6 @@ create or replace package cd_firmas_utl is
    pragma restrict_references(endereco,
                               wnds,
                               wnps);
-                              
-   --------------------------------------------------------------------------------
-   function endereco_com_numero(cod in cd_firmas.firma%type) return cd_firmas.endereco%type;
-   pragma restrict_references(endereco_com_numero,
-                              wnds,
-                              wnps);                            
    --------------------------------------------------------------------------------
    function uf_cidade(cod in cd_cidades.cod_cidade%type) return cd_cidades.uf%type;
    pragma restrict_references(uf_cidade,
@@ -398,36 +390,7 @@ create or replace package body cd_firmas_utl is
       when others then
          return false;
       
-   end;  
-   
-   --------------------------------------------------------------------------------
-   function is_funcionario(p_firm in cd_firmas.firma%type ) return VARCHAR2
-   /*
-      || Retorna se codigo é uma filial
-      */
-    is
-      cursor cr is
-        select 'S'
-          from cd_classif f
-         where f.firma = p_firm
-           and f.tipo_firma in ('FUNCIONARIO','COLABORADOR');
-
-      v_ret VARCHAR2(1);
-   begin
-      v_ret := 'N';
-      
-      OPEN CR;
-      FETCH CR INTO V_RET;
-      CLOSE CR;
-
-      return v_ret;
-   
-   exception
-   
-      when others then
-         return 'N';
-      
-   end;    
+   end;   
    --------------------------------------------------------------------------------
    function nome(cod in cd_firmas.firma%type) return cd_firmas.nome%type
    /*
@@ -561,25 +524,6 @@ create or replace package body cd_firmas_utl is
          return '';
       
    end;
-   --------------------------------------------------------------------------------
-   function endereco_com_numero(cod in cd_firmas.firma%type) return cd_firmas.endereco%type
-   /*
-      || Retorna endereco com numero
-      */
-    is
-   
-      v_campo cd_firmas.endereco%type;
-   
-   begin
-      select endereco||decode(f.numero,null,'',' - '|| f.numero) into v_campo from cd_firmas f where firma = cod;
-   
-      return v_campo;
-   
-   exception
-      when others then
-         return '';
-      
-   end;   
    --------------------------------------------------------------------------------
    function uf_cidade(cod in cd_cidades.cod_cidade%type) return cd_cidades.uf%type
    /*
