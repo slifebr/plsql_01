@@ -5017,7 +5017,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                      insert into gs_preco_venda
                         (empresa
                         ,nr_pc_seq
-                        ,rev
                         ,mercado
                         ,consumidor
                         ,data
@@ -5034,7 +5033,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                      values
                         (regpv.empresa
                         ,v_id_pv
-                        ,0 -- default 
                         ,regpv.mercado
                         ,regpv.consumidor
                         ,trunc(sysdate)
@@ -5055,7 +5053,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                   insert into gs_preco_venda_prod
                      (empresa
                      ,nr_pc_seq
-                     ,rev
                      ,nr_pc_seq_pro
                      ,mercado
                      ,seq_ocproit
@@ -5074,7 +5071,6 @@ procedure gerar_opos_montagem(p_emp      cd_empresas.empresa%type
                   values
                      (regpv2.empresa
                      ,v_id_pv
-                     , 0 -- default
                      ,gs_preco_venda_prod_seq.nextval
                      ,null
                      ,null

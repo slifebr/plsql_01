@@ -2393,8 +2393,7 @@ create or replace package body oc_util is
                     qtde / rendimento
                 end * a.custo_rend
            from oc_orcam_gr_prod a
-          where a.seq_ocorgprod = p_seq
-          ;
+          where a.seq_ocorgprod = p_seq;
    
       v_ret number;
    

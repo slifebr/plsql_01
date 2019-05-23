@@ -8111,7 +8111,7 @@ create or replace package body cd_nfe_utl is
       */
    
       v_versao  := '4.00';
-      v_verproc := '4.19.01'; --'4.00_b017';
+      v_verproc := '4.00_b017';
    
       -- limpa tabela temporaria
       delete t_nfe;
@@ -8128,7 +8128,8 @@ create or replace package body cd_nfe_utl is
         from fs_param
        where empresa = pp_emp;
    
-
+      -- limpa tabela temporaria
+      delete t_nfe;
    
       -- dados da nota fiscal
       select * into rg_nf from ft_notas where id = pp_id;
@@ -11326,7 +11327,243 @@ create or replace package body cd_nfe_utl is
                        ,pp_id
                        ,v_ordem  );
                        
+      /*
+      v_linha := '<transp>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+   
+     
+     --/30/01/2018 -slf
+     --/alterado para buscar na tabela nfe_transporte
+     
+     
+     open crTransp;
+     fetch crTransp into rg_transp;
+     close crTransp;
+     
+     if rg_transp.modalidade_frete is not null then
+       v_tp_frete := rg_transp.modalidade_frete;
+     end if;
+     
+      v_linha := '<modFrete>' || v_tp_frete || '</modFrete>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+   
+      if rg_nf.cod_transp is not null then
+      
+         v_linha := '<transporta>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         if rg_tra.natureza = 'J' then
+            v_linha := '<CNPJ>' || replace(replace(replace(replace(rg_tra.cgc_cpf,
+                                                                   '-',
+                                                                   ''),
+                                                           '.',
+                                                           ''),
+                                                   '-',
+                                                   ''),
+                                           '/',
+                                           '') || '</CNPJ>';
+         else
+            v_linha := '<CPF>' || replace(replace(replace(replace(rg_tra.cgc_cpf,
+                                                                  '-',
+                                                                  ''),
+                                                          '.',
+                                                          ''),
+                                                  '-',
+                                                  ''),
+                                          '/',
+                                          '') || '</CPF>';
+         end if;
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '<xNome>' || trim(rg_tra.nome) || '</xNome>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         if rg_tra.iest is not null then
+            v_linha := '<IE>' || trim(replace(replace(replace(rg_tra.iest,
+                                                              '.',
+                                                              ''),
+                                                      '-',
+                                                      ''),
+                                              '/',
+                                              '')) || '</IE>';
+            v_ordem := v_ordem + 1;
+            insert into t_nfe
+            values
+               (v_ordem
+               ,v_linha);
+         end if;
+      
+         v_linha := '<xEnder>' || rg_tra.endereco || '</xEnder>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '<xMun>' || trim(cd_firmas_utl.cidade(rg_tra.firma)) ||
+                    '</xMun>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '<UF>' || rg_tra.uf || '</UF>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '</transporta>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+      end if;
+   
+      if rg_nf.placa_veic is not null and
+         rg_nf.placa_uf is not null then
+         v_linha := '<veicTransp>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '<placa>' || upper(replace(replace(rg_nf.placa_veic,
+                                                       '-',
+                                                       ''),
+                                               ' ',
+                                               '')) || '</placa>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '<UF>' || rg_nf.placa_uf || '</UF>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '<RNTC>000000000</RNTC>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      
+         v_linha := '</veicTransp>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      end if;
+   
+      v_linha := '<vol>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
 
+      v_linha := '<qVol>' || nvl(rg_nf.vol_qtd,
+                                 1) || '</qVol>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+   
+      if rg_nf.vol_especie is not null then
+         v_linha := '<esp>' || rg_nf.vol_especie || '</esp>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      end if;
+   
+      if rg_nf.vol_marca is not null then
+         v_linha := '<marca>' || rg_nf.vol_marca || '</marca>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      end if;
+   
+      if rg_nf.vol_numero is not null then
+         v_linha := '<nVol>' || rg_nf.vol_numero || '</nVol>';
+         v_ordem := v_ordem + 1;
+         insert into t_nfe
+         values
+            (v_ordem
+            ,v_linha);
+      end if;
+   
+      v_linha := '<pesoL>' || trim(replace(to_char(nvl(rg_nf.peso_liquido,
+                                                       0),
+                                                   '9999999999990D000'),
+                                           ',',
+                                           '.')) || '</pesoL>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+   
+      v_linha := '<pesoB>' || trim(replace(to_char(nvl(rg_nf.peso_bruto,
+                                                       0),
+                                                   '9999999999990D000'),
+                                           ',',
+                                           '.')) || '</pesoB>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+
+      v_linha := '</vol>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+   
+      v_linha := '</transp>';
+      v_ordem := v_ordem + 1;
+      insert into t_nfe
+      values
+         (v_ordem
+         ,v_linha);
+      */
       --/------------------------------------------------------
       --/ parcelas
       --/------------------------------------------------------

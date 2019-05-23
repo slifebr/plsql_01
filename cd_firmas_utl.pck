@@ -23,7 +23,9 @@ create or replace package cd_firmas_utl is
    --------------------------------------------------------------------------------
    function is_filial(p_firm in cd_firmas.firma%type ) return boolean;        
    --------------------------------------------------------------------------------
-   function is_funcionario(p_firm in cd_firmas.firma%type ) return VARCHAR2;                         
+   function is_funcionario(p_firm in cd_firmas.firma%type ) return VARCHAR2;   
+ --------------------------------------------------------------------------------
+   function is_arrecadador(p_firm in cd_firmas.firma%type ) return VARCHAR2;                         
   --------------------------------------------------------------------------------
    function firma_filial(emp in cd_filiais.empresa%type,
                          fil in cd_filiais.filial%type) return cd_firmas.firma%type;
@@ -403,7 +405,7 @@ create or replace package body cd_firmas_utl is
    --------------------------------------------------------------------------------
    function is_funcionario(p_firm in cd_firmas.firma%type ) return VARCHAR2
    /*
-      || Retorna se codigo é uma filial
+      || Retorna se codigo é uma Funcionario/Colaborador
       */
     is
       cursor cr is
@@ -427,7 +429,35 @@ create or replace package body cd_firmas_utl is
       when others then
          return 'N';
       
-   end;    
+   end;  
+ --------------------------------------------------------------------------------
+   function is_arrecadador(p_firm in cd_firmas.firma%type ) return VARCHAR2
+   /*
+      || Retorna se codigo é um Arrecadador
+      */
+    is
+      cursor cr is
+        select 'S'
+          from cd_classif f
+         where f.firma = p_firm
+           and f.tipo_firma in ('ARRECADADOR');
+
+      v_ret VARCHAR2(1);
+   begin
+      v_ret := 'N';
+      
+      OPEN CR;
+      FETCH CR INTO V_RET;
+      CLOSE CR;
+
+      return v_ret;
+   
+   exception
+   
+      when others then
+         return 'N';
+      
+   end;       
    --------------------------------------------------------------------------------
    function nome(cod in cd_firmas.firma%type) return cd_firmas.nome%type
    /*
