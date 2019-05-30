@@ -378,34 +378,51 @@ create or replace package body ft_ori is
       */
     is
    
+      cursor cr is
+         select sum(it.qtd)qtd
+           from ft_notas    n
+               ,ft_itens_nf it
+          where it.id = seq
+            and it.id_ft_nota = n.id
+            and n.status != 'C';
+   
+      cursor crq is
+         select sum(n.qtd)
+           from ft_itens_nf n
+               ,ft_notas    nt
+          where n.seq_origem = seq
+            and nt.id = n.id_ft_nota
+            and nt.status != 'C';
+   
+
+   
+      v_id      number(9);
+      v_tipo    ft_oper_ori.tipo%type;
+      v_saldo   number;
       v_qtd     number;
-      v_qtd_fat number;
       v_qtd_dev number;
-      v_qtd_ret number;
-      v_ret     number;
+      v_qtd_fat number;
+   
    begin
+      open cr;
+      fetch cr
+         into v_qtd;
    
-      select qtd
-            ,qtd_dev
-        into v_qtd
-            ,v_qtd_dev
-        from ft_itens_nf n
-            ,ft_notas    nt
-       where n.id = seq
-         and nt.id = n.id_ft_nota
-         and nt.status != 'C';
+      close cr;
    
-      v_qtd_ret := total_retorno(seq);
-      v_ret     := nvl(v_qtd,
-                       0) - nvl(v_qtd_ret,
-                                0) - nvl(v_qtd_dev,
-                                         0);
-      return v_ret;
+      v_qtd_fat := 0;
    
-   exception
-   
-      when others then
-         return 0;
+
+     open crq;
+     fetch crq
+        into v_qtd_fat;
+     close crq;
+    
+      v_saldo := nvl(v_qtd,
+                     0)
+                 - abs(nvl(v_qtd_fat,
+                           0));
+      return v_saldo;
       
    end;
 
@@ -762,17 +779,31 @@ create or replace package body ft_ori is
       v_qtd_dev := nvl(v_qtd_dev,
                        0);
 
-
+        
+   /*20/02/2018 foi alterado para o codigo abaixo
+      if v_qtd_dev - qtf < 0 then
+         return false;
+      end if;
+   */
    if v_qtd_dev - qtf < 0 then
       update ft_itens_nf set qtd_dev = 0 where seq_item = seq;
    else
       update ft_itens_nf set qtd_dev = qtd_dev - qtf where seq_item = seq;
    end if;
-  
+ --*/  
    -- if user = 'GESTAO' THEN
      -- RAISE_APPLICATION_ERROR(-20100,seq || ' ## ' ||v_qtd_fat || ' - '||  v_qtd_dev ||' # '|| qtf );
    -- END IF;
-
+   /*
+      IF v_qtd_fat = 0 THEN
+         v_qtd_fat := v_qtd;
+      end if;
+      if v_qtd_fat - v_qtd_dev - qtf < 0 then
+         return false;
+      end if;
+   
+      update ft_itens_nf set qtd_dev = nvl(qtd_dev,0) + qtf where seq_item = seq;
+    */
       return true;
    
    exception
